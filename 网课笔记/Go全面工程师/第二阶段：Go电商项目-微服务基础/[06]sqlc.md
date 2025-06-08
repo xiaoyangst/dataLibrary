@@ -170,7 +170,7 @@ queries := db.New(dbConn) // 现在你可以调用利用它 sqlc 生成的接口
 
 ### 结构体：Queries
 
-```
+```go
 type Queries struct {
 	db DBTX
 }
@@ -180,7 +180,7 @@ type Queries struct {
 
 ### 方法：WithTx
 
-```
+```go
 go复制编辑func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db: tx,
@@ -220,6 +220,62 @@ return tx.Commit()
 这些具体会有多少接口，取决于你在 query.sql 文件中写了多少。
 
 ![image-20250531221106747](images/image-20250531221106747.png)
+
+# 多个sql文件如何组织？
+
+我们会有多个表，不可能都放在一个 sql 文件中，应该每个表对应相应的 sql 文件。
+
+```go
+schema/
+├── users.sql         -- 创建 users 表
+├── orders.sql        -- 创建 orders 表
+└── products.sql      -- 创建 products 表
+queries/
+├── users.sql         -- 所有 users 相关查询
+├── orders.sql        -- 所有 orders 相关查询
+└── products.sql      -- 所有 products 相关查询
+
+```
+
+再看 配置文件：
+
+```go
+version: "2"
+sql:
+  - engine: "mysql"
+    schema: "schema/"        # 支持整个文件夹
+    queries: "queries/"      # 支持整个文件夹
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+```
+
+&nbsp;
+
+如果你有更多的文件夹，可以在 yaml 文件中编写多个配置：
+
+```go
+version: "2"
+sql:
+  - engine: postgresql
+    schema: "schema/users"
+    queries: "queries/users"
+    gen:
+      go:
+        package: "usersdb"
+        out: "internal/db/users"
+
+  - engine: postgresql
+    schema: "schema/orders"
+    queries: "queries/orders"
+    gen:
+      go:
+        package: "ordersdb"
+        out: "internal/db/orders"
+```
+
+更多配置方式：https://docs.sqlc.dev/en/latest/reference/config.html#
 
 # 基本使用
 
@@ -300,12 +356,16 @@ SQL语句;
 
 ## 返回类型说明
 
-| 类型          | 说明                                                |
-| ------------- | --------------------------------------------------- |
-| `:one`        | 返回一行（Go 中为 `(User, error)`）                 |
-| `:many`       | 返回多行（Go 中为 `([]User, error)`）               |
-| `:exec`       | 执行非查询类语句，不关心返回值（如 `DELETE`）       |
-| `:execresult` | 返回 `sql.Result`（如 `INSERT`, 可取 LastInsertId） |
+| 命令名        | 说明                                                     |
+| ------------- | -------------------------------------------------------- |
+| `:exec`       | 执行 `INSERT`, `UPDATE`, `DELETE`，只返回 `error`        |
+| `:execresult` | 同上，但返回 `sql.Result`（可以获取插入 ID、受影响行数） |
+| `:execrows`   | 返回受影响的行数（`int64`）                              |
+| `:execlastid` | 返回 `LastInsertId()`，通常用于插入返回主键              |
+| `:one`        | 返回单条记录（`QueryRow`）                               |
+| `:many`       | 返回多条记录（`Query`）                                  |
+
+更多内容：https://docs.sqlc.dev/en/latest/reference/query-annotations.html
 
 ## 参数绑定方式
 
@@ -330,11 +390,25 @@ type UpdateUserEmailParams struct {
 }
 ```
 
+
+
 # 官方操作指南的学习
 
 通过学习 官方的实例，来学习 query.sql 的编写，因为我们调用的接口来源于此。
 
-
+1. 检索行
+2. 计数行
+3. 插入行
+4. 更新行
+5. 删除行
+6. 准备查询
+7. 使用事务
+8. 命名参数
+9. 修改数据库架构
+10. 配置生成的结构体
+11. 嵌入结构体
+12. 覆盖类型
+13. 重命名字段
 
 
 
